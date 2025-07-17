@@ -1,6 +1,6 @@
 typedef struct {
-    struct Chunk *next;
-    // status stored in left most bit, size stored in rest
+    Chunk *next;
+    // 2 bytes; status stored in left most bit, size stored in rest
     unsigned short info;
 } Chunk;
 

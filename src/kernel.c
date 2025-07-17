@@ -149,7 +149,7 @@ void display_new_prompt()
 
 void handle_command()
 {
-    int command_len = cursor % 160 - 2;
+    const int command_len = cursor % 160 - 2;
     char command[command_len/2];
     for (int i = 0; i < command_len/2; ++i) {
         command[i] = vidmem[cursor-command_len+2+i*2];

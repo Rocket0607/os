@@ -43,12 +43,14 @@ keyboard_handler:
 start:
     cli ; blocks interrupts by clearing the IF flag, informing the processor to ignore maskable external interrupts
     mov esp, stack_space ; defines stack point as stack_space (defined later)
+    ; load gdt
     call kmain
     hlt ; halts cpu until next external interrupt
 
 section .bss
-heap_ptr resb 16384 ; reserve 8kB for the stack
-stack_space: ; sets stack_space value used above to top of stack
+heap_ptr: ; sets heap to bottom of reserved memory
+resb 16384 ; reserve 16kB
+stack_space: ; sets stack_space value used above to top of reserved memory
 
 resb 8192
 fs_ptr:
