@@ -14,6 +14,8 @@ section .text
 global start
 global read_port
 global write_port
+global load_gdt
+global reload_segments
 global load_idt
 global keyboard_handler
 global heap_ptr
@@ -32,6 +34,28 @@ write_port:
     out dx, al ; writes data in al to port in dx
     ret
 
+load_gdt:
+    cli
+    mov   AX, [esp + 4]
+    mov   [gdtr], AX
+    mov   EAX, [ESP + 8]
+    mov   [gdtr + 2], EAX
+    lgdt  [gdtr]
+    ret
+
+reload_segments:
+   ; Reload CS register containing code selector:
+   JMP   0x08:.reload_CS ; 0x08 is a stand-in for your code segment
+.reload_CS:
+   ; Reload data segment registers:
+   MOV   AX, 0x10 ; 0x10 is a stand-in for your data segment
+   MOV   DS, AX
+   MOV   ES, AX
+   MOV   FS, AX
+   MOV   GS, AX
+   MOV   SS, AX
+   RET
+
 load_idt:
     mov edx, [esp + 4]
     lidt [edx] ; required data stored in idt_ptr which is passed into load_idt (size and address packed together)
@@ -48,9 +72,15 @@ start:
     hlt ; halts cpu until next external interrupt
 
 section .bss
+gdtr: resb 6
+
+align 16
 heap_ptr: ; sets heap to bottom of reserved memory
 resb 16384 ; reserve 16kB
-stack_space: ; sets stack_space value used above to top of reserved memory
 
+align 16
+stack_space: ; sets stack_space value used above to top of reserved memory
 resb 8192
+
+align 16
 fs_ptr:

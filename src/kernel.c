@@ -1,11 +1,14 @@
 #include "../include/heap.h"
 #include "../include/keymap.h"
+#include "../include/gdt.h"
 
 #define IDT_SIZE 256
 #define KEYBOARD_STATUS_PORT 0x64
 #define KEYBOARD_DATA_PORT 0x60
 
 
+extern void load_gdt(int num_entries, uint8_t gdt_table[]);
+extern void reload_segments();
 extern void keyboard_handler(void);
 extern char read_port(unsigned short port);
 extern void write_port(unsigned short port, unsigned char data);
@@ -36,6 +39,8 @@ void idt_init(void)
 	IDT[0x21].zero = 0;
 	IDT[0x21].type_attr = 0x8e; /* INTERRUPT_GATE */
 	IDT[0x21].offset_higher = (keyboard_address & 0xffff0000) >> 16;
+    
+    // Remaps PIC interrupts to non-reserved interrupt vectors (required before defining interrupt descriptors in the table)
 
     /* Ports for PIC's
 	*	        PIC1	PIC2
@@ -83,24 +88,6 @@ void kb_init(void)
     write_port(0x21, 0xFD); // writes 11111101, enabling only IRQ1 which is what we want for the keyboard
 }
 
-void keyboard_handler_main(void)
-{
-    unsigned char status; // status of keyboard indicates whether or not something is being pressed
-    char keycode; // holds the actual keycode of key being pressed
-
-    write_port(0x20, 0x20); // End Of Interrupt, telling the PIC that it can take further interrupts (now from the keybpboard)
-
-    status = read_port(KEYBOARD_STATUS_PORT);
-    if (status & 0x01) {
-        keycode = read_port(KEYBOARD_DATA_PORT);
-        if (keycode < 0) return;
-        if (keymap[(unsigned char) keycode] == '\n') {
-            handle_command();
-        } else {
-            insert_char_at_cursor(keymap[(unsigned char) keycode]);
-        }
-    }
-}
 
 void clear_screen(void)
 {
@@ -147,7 +134,7 @@ void display_new_prompt()
     insert_char_at_cursor(' ');
 }
 
-void handle_command()
+void handle_command(void)
 {
     const int command_len = cursor % 160 - 2;
     char command[command_len/2];
@@ -159,6 +146,25 @@ void handle_command()
     display_new_prompt();
 }
 
+void keyboard_handler_main(void)
+{
+    unsigned char status; // status of keyboard indicates whether or not something is being pressed
+    char keycode; // holds the actual keycode of key being pressed
+
+    write_port(0x20, 0x20); // End Of Interrupt, telling the PIC that it can take further interrupts (now from the keybpboard)
+
+    status = read_port(KEYBOARD_STATUS_PORT);
+    if (status & 0x01) {
+        keycode = read_port(KEYBOARD_DATA_PORT);
+        if (keycode < 0) return;
+        if (keymap[(unsigned char) keycode] == '\n') {
+            handle_command();
+        } else {
+            insert_char_at_cursor(keymap[(unsigned char) keycode]);
+        }
+    }
+}
+
 void heap_test(char *a)
 {
     vidmem[0] = *a;
@@ -166,6 +172,12 @@ void heap_test(char *a)
 
 void kmain(void)
 {
+    uint8_t gdt_table[8 * NUM_GDT_ENTRIES];
+    uint8_t *target = gdt_table;
+    fill_gdt(target);
+    load_gdt(NUM_GDT_ENTRIES*8-1, gdt_table);
+    reload_segments(); 
+
     clear_screen();
     insert_char_at_cursor('$');
     insert_char_at_cursor(' ');
@@ -175,7 +187,7 @@ void kmain(void)
     init_heap();
 
     char *a = (char *)alloc(1);
-    *a = 'a';
+    *a = 'b';
     heap_test(a);
     free(a);
     while(1);

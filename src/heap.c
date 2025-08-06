@@ -20,6 +20,8 @@ When allocated:
 #define UNSET_ALLOC_FLAG(info) ((info) & ~HEAP_CHUNK_STATUS_MASK)
 #define GET_ALLOC_FLAG(info) ((info) & HEAP_CHUNK_STATUS_MASK)
 
+#define ALIGN_UP(ptr, alignment) (((ptr) + ((alignment)-1)) & ~((alignment)-1))
+
 void init_heap()
 {
     ((Chunk *)heap_ptr)[0].next = 0;
@@ -30,6 +32,8 @@ void init_heap()
 
 void* alloc(int requested_size)
 {
+    // align requested_size to ensure alignment of heap
+    requested_size = ALIGN_UP(requested_size, 8);
     // traverse heap, checking for appropriate chunk
     Chunk *curr_chunk = heap_ptr;
     while (curr_chunk != 0) {
@@ -42,9 +46,9 @@ void* alloc(int requested_size)
         return 0;
     }
     // modify curr_chunk and create new chunk to store remaining data
-    Chunk *new_chunk = (Chunk *)((char *)curr_chunk + requested_size);
+    Chunk *new_chunk = (Chunk *)((char *)curr_chunk + sizeof(Chunk) + requested_size);
     new_chunk[0].next = curr_chunk->next;
-    new_chunk[0].info = SET_SIZE(GET_SIZE(curr_chunk->info) - requested_size);
+    new_chunk[0].info = MASK_SIZE(GET_SIZE(curr_chunk->info) - requested_size);
     curr_chunk->next = new_chunk;
     curr_chunk->info = requested_size;
     curr_chunk->info = SET_ALLOC_FLAG(curr_chunk->info);
